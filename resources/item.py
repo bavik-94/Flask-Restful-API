@@ -1,13 +1,16 @@
 from flask_restful import Resource, reqparse
-from flask_jwt import jwt_required
+from flask_jwt_extended import get_jwt_identity, jwt_required, get_jwt
 from models.item import ItemModel
 
 
-
 class Items(Resource):
-    @staticmethod
-    def get():
-        return ItemModel.get_all_items()
+    @jwt_required(optional=True)
+    def get(self):  # change output if JWT is present
+        user_id = get_jwt_identity()
+        if user_id:
+            return ItemModel.get_all_items(full=True)
+        else:
+            return ItemModel.get_all_items(full=False)
 
 
 class Item(Resource):
@@ -29,15 +32,15 @@ class Item(Resource):
     def get(self, name):
         item = ItemModel.find_item_by_name(name)
         if item:
-            return {"name": item.name, "price": item.price, "store_id": item.store_id}, 200
-        return {"message": "Item not Found"}
+            return item.json(), 200
+        return {"message": "Item not Found"}, 404
 
-    @staticmethod
-    def post(name):
+    @jwt_required(fresh=True)
+    def post(self, name):
         req = Item.parser.parse_args()
 
         item = ItemModel.find_item_by_name(name)
-        new_item = ItemModel(name, req['price'], req['store_id'])
+        new_item = ItemModel(name, **req)
 
         if item is None:
             try:
@@ -54,15 +57,17 @@ class Item(Resource):
         item = ItemModel.find_item_by_name(name)
 
         if item is None:
-            item = ItemModel(name, req['price'], req['store_id'])
+            item = ItemModel(name, **req)
         else:
             item.price = req['price']
         item.save_to_db()
         return item.json()
 
-
-    @staticmethod
-    def delete(name):
+    @jwt_required()
+    def delete(self, name):
+        claims = get_jwt()
+        if not claims['is_admin']:
+            return {'message': 'You must be an admin to perform this action'}, 401
         item = ItemModel.find_item_by_name(name)
         if item:
             try:
