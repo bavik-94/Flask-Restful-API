@@ -17,11 +17,14 @@ class ItemModel(db.Model):
         self.store_id = store_id
 
     def json(self):
-        return {'name': self.name, 'price': self.price, 'store_id': self.store_id}
+        return {'id': self.id, 'name': self.name, 'price': self.price, 'store_id': self.store_id}
 
     @classmethod
-    def get_all_items(cls):
-        return {'items': list(x.json() for x in cls.query.all())}
+    def get_all_items(cls, full=False):
+        if full:
+            return {'items': list(x.json() for x in cls.query.all())}
+        else:
+            return {'items': list(x.name for x in cls.query.all())}
 
     @classmethod
     def find_item_by_name(cls, name):
